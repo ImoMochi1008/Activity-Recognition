@@ -395,33 +395,32 @@ td[background="https://services.google.com/fh/files/emails/bg_grey.png"] {
 
     <h2>レポート記述欄</h2>
     <ul>
-      <li>氏名:</li>
-      <li>学部:</li>
-      <li>学年:</li>
-      <li>学籍番号:</li>
-      <li>CNSメールアドレス:</li>
+      <li>氏名:村上公音</li>
+      <li>学部:環境情報学部</li>
+      <li>学年:三年</li>
+      <li>学籍番号:72448229</li>
+      <li>CNSメールアドレス:t24822ym</li>
     </ul>
 
     <h3>収集した行動データについて</h3>
     <ul>
-      <li>選定した行動の種類</li>
-      <li>選定した理由</li>      
-      <li>収集についての詳細</li>
-      <li>工夫した点 / 困難だった点</li>
+      <li>選定した行動の種類: 歩く、走る、階段を昇り降りする、何もしない</li>
+      <li>選定した理由：わかりやすい比較のために何もしないをいれました。またこの三つはかなり日常的にする行為なので無難かなと思い選定しました。</li>      
+      <li>収集についての詳細：階段については上り続ける・降り続けることは不可能なので家の階段を二分間往復し続けることで記録しました。</li>
+      <li>工夫した点 / 困難だった点：困難だったのは何回かデータの収集に失敗して走りなおしたり、階段を昇り降りしました。ですが、ちょうどいい運動になったとは思います。</li>
     </ul>
 
     <h3>特徴量について</h3>
     <ul>
-      <li>選定した理由</li>
-      <li>追加した特徴量について詳細</li>
-      <li>工夫した点 / 困難だった点</li>
+      <li>選定した理由:静止・歩行・階段の昇降・走行などの動作ごとの加速度の違いを識別するために、スマホの加速度センサーからX・Y・Z各軸の最大値、最小値、平均値、分散を特徴量として選定しました。それぞれの最大値と最小値からは各軸における加速度の変化範囲を把握でき、平均値からは一定時間内の加速度の傾向を、そして分散からは加速度の変動の大きさを把握できるからです。</li>
+      <li>追加した特徴量について詳細：決定木の最後の方で分散が必要だったのでLLMを頼りつつ追加しました。</li>
+      <li>工夫した点 / 困難だった点:走るデータが思ったよりも膨大だったことです。どのようにして他のデータと数が揃えられるかを試行錯誤しました。</li>
     </ul>    
 
     <h3>機械学習モデル</h3>
     <ul>
-      <li>採用したアルゴリズムや学習結果の詳細</li>
-      <li>工夫した点</li>
-      <li>工夫した点 / 困難だった点</li>
+      <li>採用したアルゴリズムや学習結果の詳細: アルゴリズムなどはスライドに乗っていたものをそのまま使いました。機械学習と聞くと時間がかかるイメージがありましたが、このくらいの数値だったらかなりすぐ出せることに驚きました。</li>
+      <li>工夫した点 / 困難だった点：とはいえ、reka自体触るのが初めてだったので、データをまとめなければいけない事や使う設定などを理解するのに苦戦しました。LLMにこれも少し便りつつ操作を理解しました。</li>
     </ul>
 
     <h3>実機に移植しての性能評価</h3>
@@ -452,12 +451,15 @@ var num_data = 0;
 var xmin = 0.0;
 var xmax = 0.0;
 var xave = 0.0;
+var xvar = 0.0;
 var ymin = 0.0;
 var ymax = 0.0;
 var yave = 0.0;
+var yvar = 0.0;
 var zmin = 0.0;
 var zmax = 0.0;
 var zave = 0.0;
+var zvar = 0.0;
 
 //////////////////////////////////////////////////////
 //Function to get sensor access permission from the browser
@@ -548,21 +550,36 @@ function handleAcceleration(ev){
 //             Then, this function will be called every 4 seconds
 //
 ////////////////////////////////////////////////////////////////////
+
+function arrVariance(arr) {
+    const ave = arrAvg(arr);
+    let sum = 0;
+
+    for (let i = 0; i < arr.length; i++) {
+        sum += Math.pow(arr[i] - ave, 2);
+    }
+
+    return sum / arr.length;
+}
+
 //helper func. to calculate average
 const arrAvg = arr => arr.reduce((a,b) => a + b, 0) / arr.length
 
 function featureExtraction(){
     xmin = Math.min.apply(Math, xdata); $('#xmin').text(xmin);
     xmax = Math.max.apply(Math, xdata); $('#xmax').text(xmax);
-    xave = arrAvg(xdata); $('#xave').text(xave);
-    
+    xave = arrAvg(xdata);               $('#xave').text(xave);
+    xvar = arrVariance(xdata);          $('#xvariance').text(xvariance);
+
     ymin = Math.min.apply(Math, ydata); $('#ymin').text(ymin);
     ymax = Math.max.apply(Math, ydata); $('#ymax').text(ymax);
-    yave = arrAvg(ydata); $('#yave').text(yave);
+    yave = arrAvg(ydata);               $('#yave').text(yave);
+    yvar = arrVariance(ydata);          $('#yvariance').text(yvariance);
 
     zmax = Math.max.apply(Math, zdata); $('#zmax').text(zmax);
     zmin = Math.min.apply(Math, zdata); $('#zmin').text(zmin);
-    zave = arrAvg(zdata); $('#zave').text(zave);
+    zave = arrAvg(zdata);               $('#zave').text(zave);
+    zvar = arrVariance(zdata);     $('#zvariance').text(zvariance);
 }
 
 
@@ -578,56 +595,51 @@ function featureExtraction(){
 ////////////////////////////////////////////////////////////////////
 function classify(){
 
-    if (ymax <= 3.8) {
-        if (xmin <= -1.1) {
-            if (ymax <= 1.5) {
-                if (zmin <= -4) {
-                    return "step-updown";
-                } else if (zmin > -4) {
-                    if (ymin <= -2) {
-                        if (xmax <= 1.8) {
-                            return "step-updown";
-                        } else if (xmax > 1.8) {
-                            return "walking";
-                        }
-                    } else if (ymin > -2) {
-                        return "walking";
-                    }
-                }
-            } else if (ymax > 1.5) {
-                if (xmin <= -1.7) {
-                    if (xmin <= -2.2) {
-                        if (xvariance <= 2.036994) {
-                            return "step-updown";
-                        } else if (xvariance > 2.036994) {
-                            return "walking";
-                        }
-                    } else if (xmin > -2.2) {
-                        if (yvariance <= 0.554376) {
-                            return "step-updown";
-                        } else if (yvariance > 0.554376) {
-                            return "walking";
-                        }
-                    }
-                } else if (xmin > -1.7) {
-                    return "walking";
-                }
-            }
-        } else if (xmin > -1.1) {
-            return "standing";
-        }
-    } else if (ymax > 3.8) {
-        return "jumping";
-    }
-
-    
-    /*
-    if(xmax > 1){
-	return 'walking';
+    if (ymax <= 0.547011){
+        return "still";
     }else{
-	return 'still';
+        if (ymax <= 4.714462){
+            if (xmax <= 3.150691){
+                if (ymax <= 2.789951){
+                    return "stairs";
+                }else{
+                    if (ymax <= 3.494964){
+                        return "walk";
+                    }else{
+                        if (zave <= -0.178306){
+                            return "walk";
+                        }else{
+                            if (zaverage <= -0.125562){
+                                return "run";
+                            }else{
+                                if (zmax <= 4.282214){
+                                    return "walk";
+                                }else{
+                                    if (yaverage <= 0.178843){
+                                        if (xmin <= -2.56505){
+                                            return "run";
+                                        }else{
+                                            if (xvar <= 0.941203){
+                                                return "run";
+                                            }else{
+                                                return "walk";
+                                            }
+                                        }
+                                    }else{
+                                        return "walk";
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }else{
+                return "stairs";
+            }
+        }else{
+            return "run";
+        }
     }
-    */
 }
 
 </script>
